@@ -1,76 +1,68 @@
 #!/usr/bin/env python3
 
-# This file differs from dl.py in that it utilizes youtube-dlp, a fork with more features (such as sponcerblock)
+# This file differs from dl.py in that it utilizes youtube-dlp, a fork with more features (such as sponsorblock)
 import opml
 import feedparser
 import yt_dlp
 import sys
+import os.path
 from glob import glob
 from pprint import pprint
 from yt_dlp.postprocessor.sponsorblock import SponsorBlockPP
 
-if sys.version_info[0] < 3:
-    raise Exception('Must be using Python 3')
-
 from time import time, mktime, strptime
-from datetime import datetime
+from datetime import datetime, timedelta
 
-if len(glob('last.txt')) == 0:
-    f = open('last.txt', 'w')
-    f.write(str(time()))
-    print('Initialized a last.txt file with current timestamp.')
-    f.close()
+VIDEO_DIR = '/data/data/com.termux/files/home/storage/movies/youtube/'
+DATA_DIR = '/data/data/com.termux/files/home/.config/youtube-dlp-subscriptions/'
 
-else:
-    f = open('last.txt', 'r')
-    content = f.read()
-    f.close()
+# note: if using sponsorblock, only '.ass/.lrc' file formats will be chopped alongside video. All other formats will have mis-synced subtitles
+YDL_OPTS = {
+  'ignoreerrors': True,
+  'outtmpl': VIDEO_DIR + '/%(uploader)s_%(id)s.%(ext)s',
+  'ffmpeg-location': '/usr/bin/ffmpeg',
+  'postprocessors': [{
+    'key': 'SponsorBlock',
+    'when': 'pre_process'
+  }, {
+    'key': 'ModifyChapters',
+    'remove_sponsor_segments': SponsorBlockPP.CATEGORIES.keys(),
+    'force_keyframes': False
+  }],
+  'write_subtitles': True,
+  'nopart': True,
+  #'subtitleslang'
+  'download_archive' : os.path.join(DATA_DIR, 'download_archive'),
+  'format': 'best[height=1080]/(bestvideo*[height=1080]+bestaudio)/best[height=720]/(bestvideo*[height=720]+bestaudio)/(bestvideo*+bestaudio)/best',
+}
 
-    outline = opml.parse('subs.xml')
+outline = opml.parse(os.path.join(DATA_DIR, 'subs.xml'))
 
-    ptime = datetime.utcfromtimestamp(float(content))
-    ftime = time()
+ptime = datetime.today() - timedelta(days=2)
 
-    urls = []
-
-    for i in range(0,len(outline[0])):
-        urls.append(outline[0][i].xmlUrl)
+for item in outline[0]:
+    feed = feedparser.parse(item.xmlUrl)
+    name_filter = ""
+    if hasattr(item, "filter"):
+        name_filter = item.filter
 
     videos = []
-    for i in range(0,len(urls)):
-        print('Parsing through channel '+str(i+1)+' out of '+str(len(urls)), end='\r')
-        feed = feedparser.parse(urls[i])
-        for j in range(0,len(feed['items'])):
-            timef = feed['items'][j]['published_parsed']
-            dt = datetime.fromtimestamp(mktime(timef))
-            if dt > ptime:
-                videos.append(feed['items'][j]['link'])
-
-    if len(videos) == 0:
-        print('Sorry, no new video found')
-    else:
-        print(str(len(videos))+' new videos found')
-
-    # note: if using sponsorblock, only '.ass/.lrc' file formats will be chopped alongside video. All other formats will have mis-synced subtitles
-    ydl_opts = {
-      'ignoreerrors': True,
-      'outtmpl': '/app/downloads/%(uploader)s_%(title)s.%(ext)s',
-      'ffmpeg-location': '/usr/bin/ffmpeg',
-      'postprocessors': [{
-        'key': 'SponsorBlock',
-        'when': 'pre_process'
-      }, {
-        'key': 'ModifyChapters',
-        'remove_sponsor_segments': SponsorBlockPP.CATEGORIES.keys(),
-        'force_keyframes': True
-      }],
-      # The current format string favors videos of 480p unless the video is larger than 128MB. In which case, it will grab 360p. Worst video is absolute fallback.
-      'format': '(bestvideo+bestaudio/best)[height<=360][filesize>128M]/(bestvideo+bestaudio/best)[height<=480]/(worstvideo+worstaudio/worst)',
-    }
-
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+    for video in reversed(feed['items']):
+        timef = video['published_parsed']
+        dt = datetime.fromtimestamp(mktime(timef))
+        if dt < ptime:
+            continue
+        if name_filter not in video['title']:
+            # print(f"skipping {video['title']}")
+            continue
+        videos.append(video['link'])
+    if not videos:
+        continue
+    print(f'{item.text}')
+    item_opts = YDL_OPTS.copy()
+    for opt in item:
+        item_opts[opt.text] = opt.value
+    with yt_dlp.YoutubeDL(item_opts) as ydl:
         ydl.download(videos)
 
-    f = open('last.txt', 'w')
-    f.write(str(ftime))
-    f.close()
+input(".")
