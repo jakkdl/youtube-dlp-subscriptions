@@ -3,6 +3,13 @@
 Downloads new videos from your YouTube subscription feeds since the last run.
 
 
+## Changes from upstream
+subs.xml placed inside .config/youtube-dlp-subscriptions (though currently hardcoded)
+supports custom video directory
+instead of a last.txt, it uses yt-dlp's archive file
+    todo: probably do this within python for speedup, not needing to limit to recent videos, and have less verbose output
+channels can specify name filters on what to include, and custom options passed onto yt-dlp
+
 ## Requirements
 
 This script requires python3. Additional dependencies can be found in the `requirements.txt` file.
