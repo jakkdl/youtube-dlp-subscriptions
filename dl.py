@@ -51,7 +51,7 @@ def write_subs(subs: Subs, data_dir: str) -> None:
     if not os.path.isdir(data_dir):
         os.makedirs(data_dir)
     with open(os.path.join(data_dir, "subs.json"), "w", encoding="utf-8") as file:
-        file.write(json.dumps(subs))
+        file.write(json.dumps(subs, indent=4))
 
 
 def get_channel_info(url: str) -> tuple[str, str]:
@@ -92,18 +92,23 @@ def download(args: argparse.Namespace) -> None:
         "ignoreerrors": True,
         "outtmpl": args.video_dir + "/%(uploader)s_%(id)s.%(ext)s",
         "ffmpeg-location": "/usr/bin/ffmpeg",
-        "postprocessors": [
-            {"key": "SponsorBlock", "when": "pre_process"},
-            {
-                "key": "ModifyChapters",
-                "remove_sponsor_segments": SponsorBlockPP.CATEGORIES.keys(),
-                "force_keyframes": True,
-            },
-        ],
-        "write_subtitles": True,  # vlc doesn't support proper subtitles anyway
-        "nopart": True,
-        #'subtitleslang'
-        #"download_archive": os.path.join(args.data_dir, "download_archive"),
+        #"postprocessors": [
+            #{
+                #"key": 
+            #{"key": "SponsorBlock", "when": "pre_process"},
+            #{
+            #    "key": "ModifyChapters",
+            #    "remove_sponsor_segments": SponsorBlockPP.CATEGORIES.keys(),
+            #    "force_keyframes": True,
+            #},
+        #],
+        "writesubtitles": False,
+        "nopart": False,
+        'subtitleslangs': "en",
+        #"subtitlesformat": "srt",
+        "hls_use_mpegts": True,
+        "simulate": args.dry_run,
+        "download_archive": os.path.join(args.data_dir, "download_archive"),
         "format": (
             "best[height=1080]"
             "/(bestvideo*[height=1080]+bestaudio)"
@@ -112,11 +117,12 @@ def download(args: argparse.Namespace) -> None:
             "/(bestvideo*+bestaudio)/best"
         ), }
     outline = read_subs(args.data_dir)
-    archive = read_archive(args.archive_file)
+    #archive = read_archive(args.archive_file)
 
     ptime = datetime.today() - timedelta(days=args.days_back)
 
     for item in outline:
+        print(item["name"])
         url = f'https://www.youtube.com/feeds/videos.xml?channel_id={item["id"]}'
         feed = feedparser.parse(url)
 
@@ -126,11 +132,14 @@ def download(args: argparse.Namespace) -> None:
 
             if datetime.fromtimestamp(mktime(timef)) < ptime:
                 continue
-            if 'filter' in item and not re.match(item['filter'], video['title']):
+            if 'ignore' in item and re.match(item['ignore'], video['title'], re.IGNORECASE):
+                print(f"ignoring {video['title']}")
+                continue
+            if 'filter' in item and not re.match(item['filter'], video['title'], re.IGNORECASE):
                 print(f"skipping {video['title']}")
                 continue
-            if video["link"] in archive:
-                continue
+            #if video["link"] in archive:
+                #continue
             videos.append(video["link"])
 
         if not videos:
@@ -147,9 +156,9 @@ def download(args: argparse.Namespace) -> None:
                 except yt_dlp.DownloadError as err:
                     print(err)
                 else:
-                    archive[video] = ptime
+                    #archive[video] = ptime
                     print(f'downloaded {video}')
-    write_archive(args.archive_file, archive)
+    #write_archive(args.archive_file, archive)
 
 
 def main() -> None:
@@ -159,6 +168,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--download", action='store_true', help="download new videos"
+    )
+    parser.add_argument(
+        "--wait", action='store_true', help="download new videos"
+    )
+    parser.add_argument(
+        "--dry-run", action='store_true', help="dry as the saharan desert"
     )
     parser.add_argument(
         "--subscribe", type=str, help="subscribe to channel, adding it to subs.json"
@@ -191,6 +206,8 @@ def main() -> None:
         subscribe(args.subscribe, args.filter, args.data_dir)
     if args.download:
         download(args)
+    if args.wait:
+        input("done")
 
 
 if __name__ == "__main__":
