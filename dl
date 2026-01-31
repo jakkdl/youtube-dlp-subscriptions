@@ -1,6 +1,6 @@
 #!/bin/bash
 export XDG_DATA_HOME=/data/data/com.termux/files/home/.local/share
-cd /data/data/com.termux/files/home/youtube-dlp-subscriptions/
+cd /data/data/com.termux/files/home/Git/youtube-dlp-subscriptions/
 source .venv/bin/activate
 flock -n $XDG_DATA_HOME/youtube-dlp-subscriptions/lock .venv/bin/python ./dl.py $@ || echo "locked"
 #/data/data/com.termux/files/home/.cache/pypoetry/virtualenvs/youtube-dlp-subscriptions-LeU2vLOq-py3.10/bin/python dl.py $@

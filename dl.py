@@ -105,15 +105,19 @@ def download(args: argparse.Namespace) -> None:
         "writesubtitles": False,
         "nopart": False,
         'subtitleslangs': "en",
+        "noprogress": True,
+        "quiet": False,
+        'match_filter': yt_dlp.utils.match_filter_func(['live_status=?not_live'], None),
         #"subtitlesformat": "srt",
-        "hls_use_mpegts": True,
+        #"hls_use_mpegts": True,
         "simulate": args.dry_run,
+        "usenetrc": True,
         "download_archive": os.path.join(args.data_dir, "download_archive"),
         "format": (
             "best[height=1080]"
             "/(bestvideo*[height=1080]+bestaudio)"
-            "/best[height=720]"
-            "/(bestvideo*[height=720]+bestaudio)"
+            #"/best[height=720]"
+            #"/(bestvideo*[height=720]+bestaudio)"
             "/(bestvideo*+bestaudio)/best"
         ), }
     outline = read_subs(args.data_dir)
